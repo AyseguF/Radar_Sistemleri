@@ -8,29 +8,71 @@ Düşük maliyetli gömülü donanımlar (Arduino Uno ve ESP32-CAM) ile üst sev
 
 Sistem, tek bir sensör türünün (sadece optik kamera veya sadece radar) zafiyetlerini ortadan kaldırmak amacıyla iki aşamalı bir füzyon mimarisiyle çalışır
 
-1. Ön Algılama (Radar Döngüsü) Arduino Uno'ya bağlı servo motor üzerindeki ultrasonik sensör sürekli yatay tarama yapar. Nesne $4text{ cm} - 45text{ cm}$ eşik değerine girdiğinde Asenkron UDP Tetikleme Sinyali (Port 5006) üzerinden Python sunucusuna bildirilir.
-2. Sınıflandırma ve Takip (Görüntü İşleme) Tetikleme sinyaliyle birlikte ESP32-CAM video akışı aktive edilir. Görüntüler, hava araçlarına özel AOD-4 veri kümesiyle eğitilen YOLOv8s modeline beslenir ve anlık hedef tespiti gerçekleştirilir.
+**1. Ön Algılama (Radar Döngüsü)** :  Arduino Uno'ya bağlı servo motor üzerindeki ultrasonik sensör sürekli yatay tarama yapar. Nesne 4cm - 45cm eşik değerine girdiğinde **mAsenkron UDP Tetikleme Sinyali** (Port 5006) üzerinden Python sunucusuna bildirilir.
+**2. Sınıflandırma ve Takip (Görüntü İşleme)** :  Tetikleme sinyaliyle birlikte ESP32-CAM video akışı aktive edilir. Görüntüler, hava araçlarına özel **AOD-4** veri kümesiyle eğitilen **YOLOv8s** modeline beslenir ve anlık hedef tespiti gerçekleştirilir.
+
+---
+
+## 📡 UDP ve Port Haberleşme Mimarisi
+
+Projenin en kritik mühendislik altyapısı, farklı platformların (Arduino [C++], Processing [Java] ve Python) birbirleriyle sıfır gecikmeye yakın ve asenkron olarak haberleşmesini sağlayan **UDP (User Datagram Protocol)** ağ katmanıdır. 
+
+Seri port (UART) kilitlenmelerini ve iş parçacığı (thread) bloklanmalarını engellemek için tasarlanan ağ şeması şu şekildedir:
+
+* **Arduino <-> Processing (Seri Port):** Alt seviye donanım, milisaniyelik mesafe ve servo açı verilerini seri port üzerinden Processing köprüsüne aktarır.
+* **Processing <-> Python Sunucusu (Port 5006):** Radar taraması esnasında kritik bir mesafe eşiği aşıldığı an, Processing bu port üzerinden Python'a asenkron bir tetikleme datagramı fırlatır. Python bu sinyali alana kadar arka planda derin öğrenme modelini uyku modunda tutarak işlemciyi yormaz.
+* **Python Sunucusu <-> Processing / Arduino (Port 5005):** YOLOv8 modeli görüntüyü işleyip hedef merkezini kestirdikten sonra, hesaplanan yeni açısal komutları bu port üzerinden geri gönderir. Arduino, bu paketi çözerek kamerayı hedefe kilitler.
+
+---
+
+## 🎬 Sistem Çalışma Demoları (Videolar)
+
+Sistemin farklı senaryolardaki çalışma durumlarına ait otonom tepki demoları aşağıda listelenmiştir:
+
+### Durum 1: Helikopter Algılama (Aktif Kilitlenme ve Sürekli Takip)
+*Sistem ultrasonik radarla hedefi yakalar, YOLOv8 nesneyi "Helikopter" olarak sınıflandırır ve kamera servoları hedef kadrajdan çıkana kadar sürekli otonom takip gerçekleştirir.*
+
+| Radar Arayüzü Görünümü | Donanım ve Kamera Takip Döngüsü |
+|---|---|
+| <img src="Media\helikopter.gif" width="400"> |
+
+---
+### Durum 2: Drone ve Uçak Algılama (Hız/Yön Kestirimi ve Steganografik Kayıt)
+*Hedef algılanır, sürat ve yaklaşma/uzaklaşma yönü Kosinüs Teoremi ile hesaplanır. Veriler `stepic` ile suçüstü fotoğrafının içine gizlenerek arşivlenir ve sistem tarama moduna sıfırlanır.*
+
+| Otonom Veri Kayıt Süreci (Video) |
+|---|
+| <img src="Media\uçak.gif" width="600"> |
+
+---
+
+### Durum 3: Kuş Algılama (Yanıltıcı Gürültü Filtreleme)
+*YOLOv8 nesneyi "Kuş" (tehdit değil) olarak sınıflandırdığında sistem gereksiz mekanik takip yapmaz, döngüyü kırar ve anında radar moduna geri döner.*
+
+| Yanlış Alarm Filtreleme Demosu |
+|---|
+| <img src="Media\kuş.gif" width="600"> |
 
 ---
 
 ## 🛠️ Donanım Bileşenleri
 
- Arduino Uno Alt seviye donanım kontrol birimi.
- HC-SR04 Ultrasonic Sensor Mesafe ve radar tarama sensörü.
- SG90 Servo Motor (x2) Radar yatay tarama ve Kamera yönlendirme mekanizması.
- ESP32-CAM Gerçek zamanlı video yayın modülü.
+ * **Arduino Uno** :  Alt seviye donanım kontrol birimi.
+ * **HC-SR04 Ultrasonic Sensor** : Mesafe ve radar tarama sensörü.
+ * **SG90 Servo Motor (x2)** : Radar yatay tarama ve Kamera yönlendirme mekanizması.
+ * **ESP32-CAM** : Gerçek zamanlı video yayın modülü.
 
 ---
 
 ## 📐 Matematiksel Model (Sürat ve Yön Kestirimi)
 
-Ardışık iki radar döngüsünden elde edilen konum verileri $[(d_1, beta_1, t_1) text{ ve } (d_2, beta_2, t_2)]$ üzerinden açısal fark ($Deltabeta = beta_2 - beta_1$) kullanılarak Kosinüs Teoremi ile doğrusal yer değiştirme ($L$) ve ortalama radyal sürat ($V$) hesaplanır
+Ardışık iki radar döngüsünden elde edilen konum verileri (d₁, β₁, t₁) ve (d₂, β₂, t₂) üzerinden açısal fark (∆β = | β₁ - β₂ |) kullanılarak Kosinüs Teoremi ile doğrusal yer değiştirme L ve ortalama radyal sürat V hesaplanır
 
-$$L = sqrt{d_1^2 + d_2^2 - 2d_1d_2cos(Deltabeta)}$$
+L = √d₁² + d₂²- 2 x d₁ x d₂ x cos(∆β)
 
-$$V = frac{L}{Delta t}$$
+V = L/∆t
 
- Yön Analizi $d_2  d_1$ ise hedef Yaklaşıyor (Kritik Tehdit), $d_2  d_1$ ise Uzaklaşıyor olarak etiketlenir.
+ Yön Analizi d₁ < d₂ ise hedef Yaklaşıyor (Kritik Tehdit), d₁ > d₂ ise Uzaklaşıyor olarak etiketlenir.
 
 ---
 
@@ -44,20 +86,23 @@ $$V = frac{L}{Delta t}$$
 
 ## 📊 Deneysel Bulgular ve Performans
 
- YOLOv8s Doğruluk Oranı AOD-4 veri setinde $0.969text{ mAP@50}$ skoruna ulaşılmıştır.
- Çıkarım Süresi (Latency) YOLOv8n modeli $14text{ ms}$ çıkarım süresi ile gerçek zamanlı gömülü sistem döngüsünü doğrulamıştır.
- Yanlış Alarm Engelleme Gelişmiş veri artırımı (Mosaic, Mixup) sayesinde Kuş-İHA karışıklık oranı %15'ten %3'e düşürülmüştür.
-
+ YOLOv8s Doğruluk Oranı AOD-4 veri setinde $0.969 mAP@50 skoruna ulaşılmıştır.
 ---
 
 ## 📂 Dosya Yapısı
 
 ```text
-├── arduino_radar
-│   └── radar_control.ino      # Servo motor, mesafe ölçümü ve yumuşak takip motoru kodları
-├── processing_gui
-│   └── radar_interface.pde    # Grafiksel radar ekranı, UDP haberleşme ve el sıkışma köprüsü
+├──Media
+│   ├──Helikopter.gif
+│   ├──Kuş.gif
+│   └──Uçak.gif
+├──CameraWebServer
+│   └──CameraWebServer.ino         #Kamera kodları
+├── sketch_may16a
+│   └── sketch_may16a.ino          # Servo motor, mesafe ölçümü ve yumuşak takip motoru kodları
+├── sketch_260516b
+│   └── sketch_260516b.pde         # Grafiksel radar ekranı, UDP haberleşme ve el sıkışma köprüsü
 ├── python_ai
-│   ├── main.py                # YOLOv8 çıkarım, UDP dinleyici ve takip kararı ana motoru
-│   └── stego_logger.py        # Stepic kütüphanesi ile resim içine veri gizleme modülü
-└── README.md                  # Proje genel dökümantasyonu
+│   ├── Nesne_Tesbit_ve_Takip.py   # YOLOv8 çıkarım, UDP dinleyici ve takip kararı ana motoru
+│   └── Kayıt_Okuma.py             # Stepic kütüphanesi ile resim içine | eri gizleme modülü
+└── README.md                      # Proje genel dökümantasyonu
