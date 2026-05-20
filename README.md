@@ -33,7 +33,7 @@ Sistemin farklı senaryolardaki çalışma durumlarına ait otonom tepki demolar
 *Sistem ultrasonik radarla hedefi yakalar, YOLOv8 nesneyi "Helikopter" olarak sınıflandırır ve kamera servoları hedef kadrajdan çıkana kadar sürekli otonom takip gerçekleştirir.*
 
 | Radar Arayüzü Görünümü / Donanım ve Kamera Takip Döngüsü |
-|---|---|
+|---|
 | <img src="Media\helikopter.gif" width="400"> |
 
 ---
