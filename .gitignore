@@ -1,0 +1,15 @@
+# Python önbellekleri
+__pycache__/
+*.pyc
+
+# Büyük YOLO ağırlıkları ve veri setleri
+*.pt
+*.onnx
+runs/
+datasets/
+AOD-4/
+
+# Yerel test resimleri veya loglar
+TEHDIT_*.png
+*.zip
+AOD 4.zip
