@@ -68,9 +68,9 @@ Sistemin farklı senaryolardaki çalışma durumlarına ait otonom tepki demolar
 
 Ardışık iki radar döngüsünden elde edilen konum verileri (d₁, β₁, t₁) ve (d₂, β₂, t₂) üzerinden açısal fark (∆β = | β₁ - β₂ |) kullanılarak Kosinüs Teoremi ile doğrusal yer değiştirme L ve ortalama radyal sürat V hesaplanır
 
->L = √d₁² + d₂²- 2 x d₁ x d₂ x cos(∆β)
+>                                                         L = √d₁² + d₂²- 2 x d₁ x d₂ x cos(∆β)
 
->V = L/∆t
+>                                                                      V = L/∆t
 
  Yön Analizi d₁ < d₂ ise hedef Yaklaşıyor (Kritik Tehdit), d₁ > d₂ ise Uzaklaşıyor olarak etiketlenir.
 
